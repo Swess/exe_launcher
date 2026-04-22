@@ -1,12 +1,15 @@
 package launcher
 
 import "core:fmt"
+import "core:strings"
 import mu "vendor:microui"
 import rl "vendor:raylib"
 
 build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 	w := rl.GetScreenWidth()
 	h := rl.GetScreenHeight()
+
+	clear(&app.drop_zones)
 
 	// Keep the mu root container sized to the raylib window (one frame lag is fine).
 	if cnt := mu.get_container(ctx, "launcher"); cnt != nil {
@@ -23,7 +26,6 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 		}
 
 		// -- Groups panel ---------------------------------------------------
-		// Reserve space for Add Group + Running panel below.
 		row_h := ctx.style.size.y + ctx.style.padding * 2
 		running_block_h := ctx.style.title_height + i32(len(app.running)) * row_h
 		reserve := row_h + running_block_h
@@ -43,7 +45,8 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 
 				if .ACTIVE in mu.header(ctx, label_text, {.EXPANDED}) {
 					mu.layout_row(ctx, {70, -150, 130}, 0)
-					mu.label(ctx, "Name:")
+					name_rect := mu.layout_next(ctx)
+					mu.draw_control_text(ctx, "Name:", name_rect, .TEXT, {})
 					if .CHANGE in mu.textbox(ctx, g.name_buf[:], &g.name_len) {
 						mark_dirty(app)
 					}
@@ -55,7 +58,32 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 						c := &g.configs[ci]
 						mu.push_id(ctx, uintptr(ci + 1))
 
-						mu.layout_row(ctx, {-180, 80, 80}, 0)
+						mu.layout_row(ctx, {28, -180, 80, 80}, 0)
+						handle_rect := mu.layout_next(ctx)
+
+						if app.drag.active {
+							append(&app.drop_zones, Drop_Zone{group = gi, cfg = ci, y = handle_rect.y})
+							if ci == len(g.configs) - 1 {
+								append(&app.drop_zones, Drop_Zone{group = gi, cfg = ci + 1, y = handle_rect.y + handle_rect.h})
+							}
+						}
+
+						// Draw handle glyph
+						is_source := app.drag.active && app.drag.src_group == gi && app.drag.src_cfg == ci
+						handle_color := ctx.style.colors[.BUTTON_HOVER] if is_source else ctx.style.colors[.BUTTON]
+						mu.draw_rect(ctx, handle_rect, handle_color)
+						mu.draw_control_text(ctx, "::", handle_rect, .TEXT, {})
+
+						// Detect drag start
+						if !app.drag.active && rl.IsMouseButtonPressed(.LEFT) {
+							mx := rl.GetMouseX()
+							my := rl.GetMouseY()
+							if mx >= handle_rect.x && mx < handle_rect.x + handle_rect.w &&
+							   my >= handle_rect.y && my < handle_rect.y + handle_rect.h {
+								app.drag = Drag{active = true, src_group = gi, src_cfg = ci}
+							}
+						}
+
 						if .CHANGE in mu.textbox(ctx, c.args_buf[:], &c.args_len) {
 							mark_dirty(app)
 						}
@@ -71,6 +99,11 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 						mu.pop_id(ctx)
 					}
 
+					// Drop zone for empty groups
+					if app.drag.active && len(g.configs) == 0 {
+						append(&app.drop_zones, Drop_Zone{group = gi, cfg = 0, y = name_rect.y + name_rect.h})
+					}
+
 					mu.layout_row(ctx, {-1}, 0)
 					if .SUBMIT in mu.button(ctx, "+ Add Config") {
 						append(&g.configs, Config{})
@@ -82,6 +115,16 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 			}
 		}
 		mu.end_panel(ctx)
+
+		// Compute hot drop zone (closest to mouse Y)
+		if app.drag.active && len(app.drop_zones) > 0 {
+			my := rl.GetMouseY()
+			best := app.drop_zones[0]
+			for z in app.drop_zones[1:] {
+				if abs(z.y - my) < abs(best.y - my) { best = z }
+			}
+			app.hot_drop = best
+		}
 
 		// -- Add group ------------------------------------------------------
 		mu.layout_row(ctx, {-1}, 0)
@@ -106,5 +149,25 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 				mu.pop_id(ctx)
 			}
 		}
+	}
+}
+
+draw_drag_overlay :: proc(app: ^App, ctx: ^mu.Context) {
+	// Insertion line
+	if app.hot_drop.group >= 0 {
+		w := rl.GetScreenWidth()
+		rl.DrawRectangle(0, app.hot_drop.y - 1, w, 2, rl.Color{100, 180, 255, 220})
+	}
+
+	// Ghost: args text at mouse Y
+	sg := &app.groups[app.drag.src_group]
+	if app.drag.src_cfg < len(sg.configs) {
+		c := &sg.configs[app.drag.src_cfg]
+		args := string(c.args_buf[:c.args_len])
+		if len(args) == 0 { args = "(empty)" }
+		my := f32(rl.GetMouseY())
+		f := (^rl.Font)(ctx.style.font)
+		cstr := strings.clone_to_cstring(args, context.temp_allocator)
+		rl.DrawTextEx(f^, cstr, rl.Vector2{40, my}, FONT_SIZE, FONT_SPACING, rl.Color{220, 220, 220, 180})
 	}
 }

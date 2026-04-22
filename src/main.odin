@@ -27,6 +27,25 @@ Running :: struct {
 	cmdline: string,
 }
 
+Drop_Zone :: struct {
+	group: int,
+	cfg:   int,
+	y:     i32,
+}
+
+Config_Move :: struct {
+	src_group: int,
+	src_cfg:   int,
+	dst_group: int,
+	dst_cfg:   int,
+}
+
+Drag :: struct {
+	active:    bool,
+	src_group: int,
+	src_cfg:   int,
+}
+
 App :: struct {
 	exe_buf:           [MAX_EXE]u8,
 	exe_len:           int,
@@ -37,6 +56,10 @@ App :: struct {
 	pending_del_group: [dynamic]int,
 	pending_del_cfg:   [dynamic][2]int,
 	pending_kill:      [dynamic]int,
+	pending_move_cfg:  [dynamic]Config_Move,
+	drag:              Drag,
+	drop_zones:        [dynamic]Drop_Zone,
+	hot_drop:          Drop_Zone,
 }
 
 SAVE_DEBOUNCE :: 500 * time.Millisecond
@@ -56,6 +79,27 @@ mark_dirty :: proc(app: ^App) {
 }
 
 apply_pending :: proc(app: ^App) {
+	if len(app.pending_move_cfg) > 0 {
+		for m in app.pending_move_cfg {
+			if m.src_group < 0 || m.src_group >= len(app.groups) { continue }
+			sg := &app.groups[m.src_group]
+			if m.src_cfg < 0 || m.src_cfg >= len(sg.configs) { continue }
+			if m.dst_group < 0 || m.dst_group >= len(app.groups) { continue }
+			dg := &app.groups[m.dst_group]
+
+			cfg := sg.configs[m.src_cfg]
+			ordered_remove(&sg.configs, m.src_cfg)
+
+			dst := m.dst_cfg
+			if m.src_group == m.dst_group && m.src_cfg < dst { dst -= 1 }
+			dst = clamp(dst, 0, len(dg.configs))
+
+			inject_at(&dg.configs, dst, cfg)
+		}
+		clear(&app.pending_move_cfg)
+		mark_dirty(app)
+	}
+
 	for idx in app.pending_kill {
 		if idx >= 0 && idx < len(app.running) {
 			kill_running(&app.running[idx])
@@ -157,12 +201,30 @@ main :: proc() {
 	defer persist_save(&app)
 
 	for !rl.WindowShouldClose() {
-		r_input(ctx)
+		r_input(ctx, app.drag.active)
 		launch_poll(&app)
 
 		mu.begin(ctx)
 		build_ui(&app, ctx)
 		mu.end(ctx)
+
+		if app.drag.active && rl.IsMouseButtonReleased(.LEFT) {
+			z := app.hot_drop
+			if z.group >= 0 {
+				src_ci := app.drag.src_cfg
+				is_noop := z.group == app.drag.src_group && (z.cfg == src_ci || z.cfg == src_ci + 1)
+				if !is_noop {
+					append(&app.pending_move_cfg, Config_Move{
+						src_group = app.drag.src_group,
+						src_cfg   = app.drag.src_cfg,
+						dst_group = z.group,
+						dst_cfg   = z.cfg,
+					})
+				}
+			}
+			app.drag.active = false
+			app.hot_drop = {}
+		}
 
 		apply_pending(&app)
 
@@ -174,6 +236,9 @@ main :: proc() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Color{32, 32, 32, 255})
 		r_draw(ctx, atlas)
+		if app.drag.active {
+			draw_drag_overlay(&app, ctx)
+		}
 		rl.EndDrawing()
 
 		free_all(context.temp_allocator)

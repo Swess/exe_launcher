@@ -5,7 +5,7 @@ import "core:unicode/utf8"
 import mu "vendor:microui"
 import rl "vendor:raylib"
 
-FONT_SIZE :: f32(20)
+FONT_SIZE    :: f32(20)
 FONT_SPACING :: f32(1)
 
 r_init_font :: proc() -> rl.Font {
@@ -40,7 +40,7 @@ to_rl_color :: #force_inline proc(c: mu.Color) -> rl.Color {
 	return rl.Color{c.r, c.g, c.b, c.a}
 }
 
-r_input :: proc(ctx: ^mu.Context) {
+r_input :: proc(ctx: ^mu.Context, drag_active: bool) {
 	mx := rl.GetMouseX()
 	my := rl.GetMouseY()
 	mu.input_mouse_move(ctx, mx, my)
@@ -55,11 +55,13 @@ r_input :: proc(ctx: ^mu.Context) {
 		mu_btn: mu.Mouse,
 	}{{.LEFT, .LEFT}, {.RIGHT, .RIGHT}, {.MIDDLE, .MIDDLE}}
 	for p in mouse_pairs {
-		if rl.IsMouseButtonPressed(p.rl_btn) {
-			mu.input_mouse_down(ctx, mx, my, p.mu_btn)
-		}
-		if rl.IsMouseButtonReleased(p.rl_btn) {
-			mu.input_mouse_up(ctx, mx, my, p.mu_btn)
+		if !drag_active {
+			if rl.IsMouseButtonPressed(p.rl_btn) {
+				mu.input_mouse_down(ctx, mx, my, p.mu_btn)
+			}
+			if rl.IsMouseButtonReleased(p.rl_btn) {
+				mu.input_mouse_up(ctx, mx, my, p.mu_btn)
+			}
 		}
 	}
 
