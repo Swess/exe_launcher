@@ -2,8 +2,8 @@ package launcher
 
 import "core:fmt"
 import "core:strings"
-import "core:time"
 import win "core:sys/windows"
+import "core:time"
 
 launch_config :: proc(app: ^App, exe_path, args: string) -> bool {
 	if len(exe_path) == 0 {
@@ -18,7 +18,7 @@ launch_config :: proc(app: ^App, exe_path, args: string) -> bool {
 	}
 
 	exe_w := win.utf8_to_wstring(exe_path, context.temp_allocator)
-	cmd_w := win.utf8_to_wstring(cmdline,  context.temp_allocator)
+	cmd_w := win.utf8_to_wstring(cmdline, context.temp_allocator)
 	if exe_w == nil || cmd_w == nil {
 		return false
 	}
@@ -27,28 +27,22 @@ launch_config :: proc(app: ^App, exe_path, args: string) -> bool {
 	si.cb = size_of(si)
 	pi: win.PROCESS_INFORMATION
 
-	ok := win.CreateProcessW(
-		exe_w,
-		cmd_w,
-		nil, nil,
-		false,
-		0,
-		nil, nil,
-		&si,
-		&pi,
-	)
+	ok := win.CreateProcessW(exe_w, cmd_w, nil, nil, false, 0, nil, nil, &si, &pi)
 	if !ok {
 		return false
 	}
 
 	win.CloseHandle(pi.hThread)
 
-	append(&app.running, Running{
-		handle  = rawptr(pi.hProcess),
-		pid     = u32(pi.dwProcessId),
-		started = time.now(),
-		cmdline = strings.clone(cmdline),
-	})
+	append(
+		&app.running,
+		Running {
+			handle = rawptr(pi.hProcess),
+			pid = u32(pi.dwProcessId),
+			started = time.now(),
+			cmdline = strings.clone(cmdline),
+		},
+	)
 	return true
 }
 

@@ -5,7 +5,7 @@ import "core:unicode/utf8"
 import mu "vendor:microui"
 import rl "vendor:raylib"
 
-FONT_SIZE    :: f32(20)
+FONT_SIZE :: f32(20)
 FONT_SPACING :: f32(1)
 
 r_init_font :: proc() -> rl.Font {

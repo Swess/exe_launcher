@@ -18,19 +18,17 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 
 	opts := mu.Options{.NO_CLOSE, .NO_TITLE, .NO_RESIZE}
 	if mu.window(ctx, "launcher", mu.Rect{0, 0, w, h}, opts) {
-		// -- Executable path ------------------------------------------------
 		mu.layout_row(ctx, {110, -1}, 0)
 		mu.label(ctx, "Executable:")
 		if .CHANGE in mu.textbox(ctx, app.exe_buf[:], &app.exe_len) {
 			mark_dirty(app)
 		}
 
-		// -- Groups panel ---------------------------------------------------
 		row_h := ctx.style.size.y + ctx.style.padding * 2
 		running_block_h := ctx.style.title_height + i32(len(app.running)) * row_h
 		reserve := row_h + running_block_h
 		groups_h := h - row_h * 2 - reserve
-		if groups_h < 120 { groups_h = 120 }
+		if groups_h < 120 {groups_h = 120}
 
 		mu.layout_row(ctx, {-1}, groups_h)
 		mu.begin_panel(ctx, "groups")
@@ -41,9 +39,22 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 
 				title := string(g.name_buf[:g.name_len])
 				label_text := title
-				if len(label_text) == 0 { label_text = "(unnamed group)" }
+				if len(label_text) == 0 {label_text = "(unnamed group)"}
 
-				if .ACTIVE in mu.header(ctx, label_text, {.EXPANDED}) {
+				mu.layout_row(ctx, {-1}, 0)
+				r := mu.layout_next(ctx)
+				hdr_id := mu.get_id(ctx, "hdr")
+				mu.update_control(ctx, hdr_id, r, {})
+				if ctx.mouse_pressed_bits == {.LEFT} && ctx.focus_id == hdr_id {
+					g.expanded = !g.expanded
+				}
+				mu.draw_control_frame(ctx, hdr_id, r, .BUTTON)
+				icon := mu.Icon.EXPANDED if g.expanded else mu.Icon.COLLAPSED
+				mu.draw_icon(ctx, icon, mu.Rect{r.x, r.y, r.h, r.h}, ctx.style.colors[.TEXT])
+				text_r := mu.Rect{r.x + r.h - ctx.style.padding, r.y, r.w - r.h + ctx.style.padding, r.h}
+				mu.draw_control_text(ctx, label_text, text_r, .TEXT)
+
+				if g.expanded {
 					mu.layout_row(ctx, {70, -150, 130}, 0)
 					name_rect := mu.layout_next(ctx)
 					mu.draw_control_text(ctx, "Name:", name_rect, .TEXT, {})
@@ -62,25 +73,41 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 						handle_rect := mu.layout_next(ctx)
 
 						if app.drag.active {
-							append(&app.drop_zones, Drop_Zone{group = gi, cfg = ci, y = handle_rect.y})
+							append(
+								&app.drop_zones,
+								Drop_Zone{group = gi, cfg = ci, y = handle_rect.y},
+							)
 							if ci == len(g.configs) - 1 {
-								append(&app.drop_zones, Drop_Zone{group = gi, cfg = ci + 1, y = handle_rect.y + handle_rect.h})
+								append(
+									&app.drop_zones,
+									Drop_Zone {
+										group = gi,
+										cfg = ci + 1,
+										y = handle_rect.y + handle_rect.h,
+									},
+								)
 							}
 						}
 
-						// Draw handle glyph
-						is_source := app.drag.active && app.drag.src_group == gi && app.drag.src_cfg == ci
-						handle_color := ctx.style.colors[.BUTTON_HOVER] if is_source else ctx.style.colors[.BUTTON]
+						is_source :=
+							app.drag.active && app.drag.src_group == gi && app.drag.src_cfg == ci
+						handle_color :=
+							ctx.style.colors[.BUTTON_HOVER] if is_source else ctx.style.colors[.BUTTON]
 						mu.draw_rect(ctx, handle_rect, handle_color)
 						mu.draw_control_text(ctx, "::", handle_rect, .TEXT, {})
 
-						// Detect drag start
 						if !app.drag.active && rl.IsMouseButtonPressed(.LEFT) {
 							mx := rl.GetMouseX()
 							my := rl.GetMouseY()
-							if mx >= handle_rect.x && mx < handle_rect.x + handle_rect.w &&
-							   my >= handle_rect.y && my < handle_rect.y + handle_rect.h {
-								app.drag = Drag{active = true, src_group = gi, src_cfg = ci}
+							if mx >= handle_rect.x &&
+							   mx < handle_rect.x + handle_rect.w &&
+							   my >= handle_rect.y &&
+							   my < handle_rect.y + handle_rect.h {
+								app.drag = Drag {
+									active    = true,
+									src_group = gi,
+									src_cfg   = ci,
+								}
 							}
 						}
 
@@ -88,7 +115,7 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 							mark_dirty(app)
 						}
 						if .SUBMIT in mu.button(ctx, "Launch") {
-							exe  := string(app.exe_buf[:app.exe_len])
+							exe := string(app.exe_buf[:app.exe_len])
 							args := string(c.args_buf[:c.args_len])
 							launch_config(app, exe, args)
 						}
@@ -99,9 +126,11 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 						mu.pop_id(ctx)
 					}
 
-					// Drop zone for empty groups
 					if app.drag.active && len(g.configs) == 0 {
-						append(&app.drop_zones, Drop_Zone{group = gi, cfg = 0, y = name_rect.y + name_rect.h})
+						append(
+							&app.drop_zones,
+							Drop_Zone{group = gi, cfg = 0, y = name_rect.y + name_rect.h},
+						)
 					}
 
 					mu.layout_row(ctx, {-1}, 0)
@@ -121,19 +150,17 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 			my := rl.GetMouseY()
 			best := app.drop_zones[0]
 			for z in app.drop_zones[1:] {
-				if abs(z.y - my) < abs(best.y - my) { best = z }
+				if abs(z.y - my) < abs(best.y - my) {best = z}
 			}
 			app.hot_drop = best
 		}
 
-		// -- Add group ------------------------------------------------------
 		mu.layout_row(ctx, {-1}, 0)
 		if .SUBMIT in mu.button(ctx, "+ Add Group") {
 			append(&app.groups, Group{})
 			mark_dirty(app)
 		}
 
-		// -- Running --------------------------------------------------------
 		run_title := fmt.tprintf("Running (%d)", len(app.running))
 		if .ACTIVE in mu.header(ctx, run_title, {.EXPANDED}) {
 			for ri := 0; ri < len(app.running); ri += 1 {
@@ -153,21 +180,26 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 }
 
 draw_drag_overlay :: proc(app: ^App, ctx: ^mu.Context) {
-	// Insertion line
 	if app.hot_drop.group >= 0 {
 		w := rl.GetScreenWidth()
 		rl.DrawRectangle(0, app.hot_drop.y - 1, w, 2, rl.Color{100, 180, 255, 220})
 	}
 
-	// Ghost: args text at mouse Y
 	sg := &app.groups[app.drag.src_group]
 	if app.drag.src_cfg < len(sg.configs) {
 		c := &sg.configs[app.drag.src_cfg]
 		args := string(c.args_buf[:c.args_len])
-		if len(args) == 0 { args = "(empty)" }
+		if len(args) == 0 {args = "(empty)"}
 		my := f32(rl.GetMouseY())
 		f := (^rl.Font)(ctx.style.font)
 		cstr := strings.clone_to_cstring(args, context.temp_allocator)
-		rl.DrawTextEx(f^, cstr, rl.Vector2{40, my}, FONT_SIZE, FONT_SPACING, rl.Color{220, 220, 220, 180})
+		rl.DrawTextEx(
+			f^,
+			cstr,
+			rl.Vector2{40, my},
+			FONT_SIZE,
+			FONT_SPACING,
+			rl.Color{220, 220, 220, 180},
+		)
 	}
 }

@@ -18,6 +18,7 @@ Group :: struct {
 	name_buf: [MAX_NAME]u8,
 	name_len: int,
 	configs:  [dynamic]Config,
+	expanded: bool,
 }
 
 Running :: struct {
@@ -81,17 +82,17 @@ mark_dirty :: proc(app: ^App) {
 apply_pending :: proc(app: ^App) {
 	if len(app.pending_move_cfg) > 0 {
 		for m in app.pending_move_cfg {
-			if m.src_group < 0 || m.src_group >= len(app.groups) { continue }
+			if m.src_group < 0 || m.src_group >= len(app.groups) {continue}
 			sg := &app.groups[m.src_group]
-			if m.src_cfg < 0 || m.src_cfg >= len(sg.configs) { continue }
-			if m.dst_group < 0 || m.dst_group >= len(app.groups) { continue }
+			if m.src_cfg < 0 || m.src_cfg >= len(sg.configs) {continue}
+			if m.dst_group < 0 || m.dst_group >= len(app.groups) {continue}
 			dg := &app.groups[m.dst_group]
 
 			cfg := sg.configs[m.src_cfg]
 			ordered_remove(&sg.configs, m.src_cfg)
 
 			dst := m.dst_cfg
-			if m.src_group == m.dst_group && m.src_cfg < dst { dst -= 1 }
+			if m.src_group == m.dst_group && m.src_cfg < dst {dst -= 1}
 			dst = clamp(dst, 0, len(dg.configs))
 
 			inject_at(&dg.configs, dst, cfg)
@@ -184,19 +185,21 @@ main :: proc() {
 	defer free(font)
 
 	mu.init(ctx, set_clipboard_cb, get_clipboard_cb)
-	ctx.style.font         = mu.Font(font)
-	ctx.style.size.y       = 20
-	ctx.style.padding      = 6
-	ctx.style.spacing      = 4
-	ctx.style.indent       = 24
+	ctx.style.font = mu.Font(font)
+	ctx.style.size.y = 20
+	ctx.style.padding = 6
+	ctx.style.spacing = 4
+	ctx.style.indent = 24
 	ctx.style.title_height = 26
-	ctx.text_width         = text_width_cb
-	ctx.text_height        = text_height_cb
+	ctx.text_width = text_width_cb
+	ctx.text_height = text_height_cb
 
 	atlas := r_build_atlas()
 	defer rl.UnloadTexture(atlas)
 
-	app: App
+	app := App {
+		hot_drop = {group = -1},
+	}
 	persist_load(&app)
 	defer persist_save(&app)
 
@@ -212,18 +215,24 @@ main :: proc() {
 			z := app.hot_drop
 			if z.group >= 0 {
 				src_ci := app.drag.src_cfg
-				is_noop := z.group == app.drag.src_group && (z.cfg == src_ci || z.cfg == src_ci + 1)
+				is_noop :=
+					z.group == app.drag.src_group && (z.cfg == src_ci || z.cfg == src_ci + 1)
 				if !is_noop {
-					append(&app.pending_move_cfg, Config_Move{
-						src_group = app.drag.src_group,
-						src_cfg   = app.drag.src_cfg,
-						dst_group = z.group,
-						dst_cfg   = z.cfg,
-					})
+					append(
+						&app.pending_move_cfg,
+						Config_Move {
+							src_group = app.drag.src_group,
+							src_cfg = app.drag.src_cfg,
+							dst_group = z.group,
+							dst_cfg = z.cfg,
+						},
+					)
 				}
 			}
 			app.drag.active = false
-			app.hot_drop = {}
+			app.hot_drop = {
+				group = -1,
+			}
 		}
 
 		apply_pending(&app)
