@@ -5,6 +5,11 @@ import "core:strings"
 import mu "vendor:microui"
 import rl "vendor:raylib"
 
+config_matches_filter :: proc(c: ^Config, filter_lower: string) -> bool {
+	args_lower := strings.to_lower(string(c.args_buf[:c.args_len]), context.temp_allocator)
+	return strings.contains(args_lower, filter_lower)
+}
+
 build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 	w := rl.GetScreenWidth()
 	h := rl.GetScreenHeight()
@@ -37,18 +42,15 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 		mu.layout_row(ctx, {-1}, groups_h)
 		mu.begin_panel(ctx, "groups")
 		{
-			filter := string(app.search_buf[:app.search_len])
+			filter_lower := strings.to_lower(string(app.search_buf[:app.search_len]), context.temp_allocator)
 			for gi := 0; gi < len(app.groups); gi += 1 {
 				g := &app.groups[gi]
 				mu.push_id(ctx, uintptr(gi + 1))
 
-				if len(filter) > 0 {
+				if len(filter_lower) > 0 {
 					has_match := false
 					for ci in 0 ..< len(g.configs) {
-						args_str := string(g.configs[ci].args_buf[:g.configs[ci].args_len])
-						args_lower := strings.to_lower(args_str, context.temp_allocator)
-						filter_lower := strings.to_lower(filter, context.temp_allocator)
-						if strings.contains(args_lower, filter_lower) {
+						if config_matches_filter(&g.configs[ci], filter_lower) {
 							has_match = true
 							break
 						}
@@ -89,13 +91,8 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 
 					for ci := 0; ci < len(g.configs); ci += 1 {
 						c := &g.configs[ci]
-						if len(filter) > 0 {
-							args_str := string(c.args_buf[:c.args_len])
-							args_lower := strings.to_lower(args_str, context.temp_allocator)
-							filter_lower := strings.to_lower(filter, context.temp_allocator)
-							if !strings.contains(args_lower, filter_lower) {
-								continue
-							}
+						if len(filter_lower) > 0 && !config_matches_filter(c, filter_lower) {
+							continue
 						}
 						mu.push_id(ctx, uintptr(ci + 1))
 
