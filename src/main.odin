@@ -52,6 +52,8 @@ Drag :: struct {
 App :: struct {
 	exe_buf:           [MAX_EXE]u8,
 	exe_len:           int,
+	search_buf:        [MAX_ARGS]u8,
+	search_len:        int,
 	groups:            [dynamic]Group,
 	running:           [dynamic]Running,
 	dirty:             bool,

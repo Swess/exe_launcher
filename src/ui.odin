@@ -24,10 +24,14 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 			mark_dirty(app)
 		}
 
+		mu.layout_row(ctx, {110, -1}, 0)
+		mu.label(ctx, "Search:")
+		mu.textbox(ctx, app.search_buf[:], &app.search_len)
+
 		row_h := ctx.style.size.y + ctx.style.padding * 2
 		running_block_h := ctx.style.title_height + i32(len(app.running)) * row_h
 		reserve := row_h + running_block_h
-		groups_h := h - row_h * 2 - reserve
+		groups_h := h - row_h * 3 - reserve
 		if groups_h < 120 {groups_h = 120}
 
 		mu.layout_row(ctx, {-1}, groups_h)
@@ -65,8 +69,17 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 						append(&app.pending_del_group, gi)
 					}
 
+					filter := string(app.search_buf[:app.search_len])
 					for ci := 0; ci < len(g.configs); ci += 1 {
 						c := &g.configs[ci]
+						if len(filter) > 0 {
+							args_str := string(c.args_buf[:c.args_len])
+							args_lower := strings.to_lower(args_str, context.temp_allocator)
+						filter_lower := strings.to_lower(filter, context.temp_allocator)
+						if !strings.contains(args_lower, filter_lower) {
+							continue
+						}
+						}
 						mu.push_id(ctx, uintptr(ci + 1))
 
 						mu.layout_row(ctx, {28, -180, 80, 80}, 0)
