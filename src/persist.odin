@@ -25,7 +25,7 @@ config_path :: proc(allocator := context.allocator) -> string {
 	if len(os.args) > 0 {exe = os.args[0]}
 	abs, abs_err := filepath.abs(exe, context.temp_allocator)
 	if abs_err != nil {abs = exe}
-	dir := filepath.dir(abs, context.temp_allocator)
+	dir := filepath.dir(abs)
 	joined, _ := filepath.join({dir, CONFIG_FILENAME}, allocator)
 	return joined
 }

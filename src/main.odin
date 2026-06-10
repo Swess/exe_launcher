@@ -26,6 +26,8 @@ Running :: struct {
 	pid:     u32,
 	started: time.Time,
 	cmdline: string,
+	exe:     string,
+	args:    string,
 }
 
 Drop_Zone :: struct {
@@ -57,6 +59,7 @@ App :: struct {
 	pending_del_group: [dynamic]int,
 	pending_del_cfg:   [dynamic][2]int,
 	pending_kill:      [dynamic]int,
+	pending_restart:   [dynamic]int,
 	pending_move_cfg:  [dynamic]Config_Move,
 	drag:              Drag,
 	drop_zones:        [dynamic]Drop_Zone,
@@ -100,6 +103,17 @@ apply_pending :: proc(app: ^App) {
 		clear(&app.pending_move_cfg)
 		mark_dirty(app)
 	}
+
+	for idx in app.pending_restart {
+		if idx >= 0 && idx < len(app.running) {
+			r := &app.running[idx]
+			exe := r.exe
+			args := r.args
+			kill_running(r)
+			launch_config(app, exe, args)
+		}
+	}
+	clear(&app.pending_restart)
 
 	for idx in app.pending_kill {
 		if idx >= 0 && idx < len(app.running) {

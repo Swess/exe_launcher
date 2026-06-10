@@ -37,10 +37,12 @@ launch_config :: proc(app: ^App, exe_path, args: string) -> bool {
 	append(
 		&app.running,
 		Running {
-			handle = rawptr(pi.hProcess),
-			pid = u32(pi.dwProcessId),
+			handle  = rawptr(pi.hProcess),
+			pid     = u32(pi.dwProcessId),
 			started = time.now(),
 			cmdline = strings.clone(cmdline),
+			exe     = strings.clone(exe_path),
+			args    = strings.clone(args),
 		},
 	)
 	return true
@@ -53,6 +55,8 @@ launch_poll :: proc(app: ^App) {
 		if code == win.WAIT_OBJECT_0 {
 			win.CloseHandle(win.HANDLE(r.handle))
 			delete(r.cmdline)
+			delete(r.exe)
+			delete(r.args)
 			unordered_remove(&app.running, i)
 		}
 	}

@@ -167,8 +167,11 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 				r := &app.running[ri]
 				mu.push_id(ctx, uintptr(ri + 1))
 
-				mu.layout_row(ctx, {-80, 70}, 0)
+				mu.layout_row(ctx, {-160, 80, 70}, 0)
 				mu.label(ctx, r.cmdline)
+				if .SUBMIT in mu.button(ctx, "Restart") {
+					append(&app.pending_restart, ri)
+				}
 				if .SUBMIT in mu.button(ctx, "Kill") {
 					append(&app.pending_kill, ri)
 				}
