@@ -37,9 +37,27 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 		mu.layout_row(ctx, {-1}, groups_h)
 		mu.begin_panel(ctx, "groups")
 		{
+			filter := string(app.search_buf[:app.search_len])
 			for gi := 0; gi < len(app.groups); gi += 1 {
 				g := &app.groups[gi]
 				mu.push_id(ctx, uintptr(gi + 1))
+
+				if len(filter) > 0 {
+					has_match := false
+					for ci in 0 ..< len(g.configs) {
+						args_str := string(g.configs[ci].args_buf[:g.configs[ci].args_len])
+						args_lower := strings.to_lower(args_str, context.temp_allocator)
+						filter_lower := strings.to_lower(filter, context.temp_allocator)
+						if strings.contains(args_lower, filter_lower) {
+							has_match = true
+							break
+						}
+					}
+					if !has_match {
+						mu.pop_id(ctx)
+						continue
+					}
+				}
 
 				title := string(g.name_buf[:g.name_len])
 				label_text := title
@@ -69,16 +87,15 @@ build_ui :: proc(app: ^App, ctx: ^mu.Context) {
 						append(&app.pending_del_group, gi)
 					}
 
-					filter := string(app.search_buf[:app.search_len])
 					for ci := 0; ci < len(g.configs); ci += 1 {
 						c := &g.configs[ci]
 						if len(filter) > 0 {
 							args_str := string(c.args_buf[:c.args_len])
 							args_lower := strings.to_lower(args_str, context.temp_allocator)
-						filter_lower := strings.to_lower(filter, context.temp_allocator)
-						if !strings.contains(args_lower, filter_lower) {
-							continue
-						}
+							filter_lower := strings.to_lower(filter, context.temp_allocator)
+							if !strings.contains(args_lower, filter_lower) {
+								continue
+							}
 						}
 						mu.push_id(ctx, uintptr(ci + 1))
 
