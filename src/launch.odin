@@ -5,10 +5,24 @@ import "core:strings"
 import win "core:sys/windows"
 import "core:time"
 
+console_clear :: proc() {
+	h := win.GetStdHandle(win.STD_OUTPUT_HANDLE)
+	if h == nil || h == win.INVALID_HANDLE_VALUE {
+		return
+	}
+	mode: win.DWORD
+	if win.GetConsoleMode(h, &mode) {
+		win.SetConsoleMode(h, mode | win.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+	}
+	fmt.print("\e[2J\e[3J\e[H")
+}
+
 launch_config :: proc(app: ^App, exe_path, args: string) -> bool {
 	if len(exe_path) == 0 {
 		return false
 	}
+
+	console_clear()
 
 	cmdline: string
 	if len(args) > 0 {
