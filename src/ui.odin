@@ -17,24 +17,15 @@ BORDER_HI :: mu.Color{60, 67, 86, 255}
 TEXT :: mu.Color{231, 234, 241, 255}
 TEXT_DIM :: mu.Color{146, 153, 172, 255}
 TEXT_FAINT :: mu.Color{92, 99, 118, 255}
-ACCENT :: mu.Color{129, 112, 255, 255}
-ACCENT_HI :: mu.Color{150, 136, 255, 255}
+ACCENT :: mu.Color{214, 219, 229, 255}
+ACCENT_HI :: mu.Color{245, 247, 250, 255}
 GREEN :: mu.Color{52, 211, 153, 255}
 RED :: mu.Color{248, 92, 112, 255}
-WHITE :: mu.Color{255, 255, 255, 255}
-
-GROUP_COLORS := [?]mu.Color {
-	{129, 112, 255, 255},
-	{45, 212, 191, 255},
-	{251, 191, 36, 255},
-	{244, 114, 182, 255},
-	{56, 189, 248, 255},
-	{163, 230, 53, 255},
-}
+GROUP_TINT :: mu.Color{170, 176, 192, 255}
 
 THEME_COLORS :: [mu.Color_Type]mu.Color {
 	.TEXT         = TEXT,
-	.SELECTION_BG = {129, 112, 255, 110},
+	.SELECTION_BG = {255, 255, 255, 60},
 	.BORDER       = BORDER,
 	.WINDOW_BG    = BG,
 	.TITLE_BG     = SURFACE,
@@ -133,7 +124,7 @@ button :: proc(ctx: ^mu.Context, key, label: string, glyph: Glyph, kind: Button_
 		fg = TEXT if is_hot else TEXT_DIM
 	case .Accent:
 		bg = ACCENT_HI if is_hot else ACCENT
-		fg = WHITE
+		fg = BG
 	case .Run:
 		bg = fade(GREEN, 64 if is_hot else 30)
 		fg = GREEN
@@ -216,7 +207,7 @@ draw_top_bar :: proc(app: ^App, ctx: ^mu.Context, w: i32) {
 
 	logo := mu.Rect{ROOT_PAD, (TOPBAR_H - 36) / 2, 36, 36}
 	shape(ctx, .Round_Lg, logo, ACCENT)
-	shape(ctx, .Play, logo, WHITE)
+	shape(ctx, .Play, logo, BG)
 
 	n_cfg := 0
 	for g in app.groups {n_cfg += len(g.configs)}
@@ -240,7 +231,6 @@ group_card :: proc(app: ^App, ctx: ^mu.Context, gi: int, visible: int, filter_lo
 	spacing := ctx.style.spacing
 	row_h := ctx.style.size.y + ctx.style.padding * 2
 	body := mu.get_layout(ctx).body
-	accent := GROUP_COLORS[gi % len(GROUP_COLORS)]
 	exe := string(app.exe_buf[:app.exe_len])
 
 	rows := 1
@@ -265,7 +255,7 @@ group_card :: proc(app: ^App, ctx: ^mu.Context, gi: int, visible: int, filter_lo
 	}
 	if ctx.hover_id == hdr_id {shape(ctx, .Round, hr, SURFACE_HI)}
 	chevron := Glyph.Chevron_Down if g.expanded else Glyph.Chevron_Right
-	shape(ctx, chevron, mu.Rect{hr.x, hr.y, GRIP_W, hr.h}, accent)
+	shape(ctx, chevron, mu.Rect{hr.x, hr.y, GRIP_W, hr.h}, GROUP_TINT)
 
 	if is_renaming {
 		res := text_field(ctx, g.name_buf[:], &g.name_len, .UI_Bold, "Group name")
@@ -280,7 +270,7 @@ group_card :: proc(app: ^App, ctx: ^mu.Context, gi: int, visible: int, filter_lo
 		x += text_in(ctx, .UI_Bold, name, x, hr, name_color) + 10
 		count := fmt.tprint(len(g.configs))
 		if len(filter_lower) > 0 {count = fmt.tprintf("%d / %d", visible, len(g.configs))}
-		badge(ctx, count, x, hr, fade(accent, 36), accent)
+		badge(ctx, count, x, hr, fade(GROUP_TINT, 36), GROUP_TINT)
 		mu.pop_clip_rect(ctx)
 	}
 
