@@ -66,6 +66,7 @@ App :: struct {
 	drag:              Drag,
 	drop_zones:        [dynamic]Drop_Zone,
 	hot_drop:          Drop_Zone,
+	renaming:          int,
 }
 
 SAVE_DEBOUNCE :: 500 * time.Millisecond
@@ -167,11 +168,11 @@ apply_pending :: proc(app: ^App) {
 }
 
 text_width_cb :: proc(font: mu.Font, str: string) -> i32 {
-	f := (^rl.Font)(font)
+	f := (^Font)(font)
 	cstr := strings.clone_to_cstring(str, context.temp_allocator)
-	return i32(rl.MeasureTextEx(f^, cstr, FONT_SIZE, FONT_SPACING).x)
+	return i32(rl.MeasureTextEx(f.rl, cstr, f.size, f.spacing).x)
 }
-text_height_cb :: proc(font: mu.Font) -> i32 {return i32(FONT_SIZE)}
+text_height_cb :: proc(font: mu.Font) -> i32 {return i32((^Font)(font).size)}
 
 set_clipboard_cb :: proc(user_data: rawptr, text: string) -> (ok: bool) {
 	c := strings.clone_to_cstring(text, context.temp_allocator)
@@ -186,35 +187,33 @@ get_clipboard_cb :: proc(user_data: rawptr) -> (text: string, ok: bool) {
 }
 
 main :: proc() {
-	rl.SetConfigFlags({.WINDOW_RESIZABLE, .VSYNC_HINT})
+	rl.SetConfigFlags({.WINDOW_RESIZABLE, .VSYNC_HINT, .MSAA_4X_HINT})
 	rl.SetTraceLogLevel(.WARNING)
-	rl.InitWindow(960, 720, "Launcher")
+	rl.InitWindow(980, 760, "Launcher")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
 	ctx := new(mu.Context)
 	defer free(ctx)
 
-	font := new(rl.Font)
-	font^ = r_init_font()
-	defer rl.UnloadFont(font^)
-	defer free(font)
+	r_init_fonts()
+	defer for f in fonts {rl.UnloadFont(f.rl)}
 
 	mu.init(ctx, set_clipboard_cb, get_clipboard_cb)
-	ctx.style.font = mu.Font(font)
+	ctx.style.font = mu_font(.UI)
 	ctx.style.size.y = 20
-	ctx.style.padding = 6
-	ctx.style.spacing = 4
-	ctx.style.indent = 24
-	ctx.style.title_height = 26
+	ctx.style.padding = 8
+	ctx.style.spacing = 6
+	ctx.style.scrollbar_size = 10
+	ctx.style.thumb_size = 32
+	ctx.style.colors = THEME_COLORS
 	ctx.text_width = text_width_cb
 	ctx.text_height = text_height_cb
-
-	atlas := r_build_atlas()
-	defer rl.UnloadTexture(atlas)
+	ctx.draw_frame = draw_frame
 
 	app := App {
 		hot_drop = {group = -1},
+		renaming = -1,
 	}
 	persist_load(&app)
 	defer persist_save(&app)
@@ -259,8 +258,8 @@ main :: proc() {
 		}
 
 		rl.BeginDrawing()
-		rl.ClearBackground(rl.Color{32, 32, 32, 255})
-		r_draw(ctx, atlas)
+		rl.ClearBackground(to_rl_color(BG))
+		r_draw(ctx)
 		if app.drag.active {
 			draw_drag_overlay(&app, ctx)
 		}
