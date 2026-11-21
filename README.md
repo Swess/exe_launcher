@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/logo.svg" alt="Config launcher logo" width="128"></p>
+
 # Config launcher
 
 A small Windows app that runs one executable with different sets of command-line arguments. You save each set of arguments as a config, sort configs into groups, and start any of them with one click.
